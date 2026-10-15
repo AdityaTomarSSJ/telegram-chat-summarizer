@@ -101,7 +101,9 @@ class UserBot:
             [{"sender": str, "text": str, "date": datetime}, ...]
         """
         messages = []
-        async for msg in self.client.iter_messages(entity, limit=limit):
+        # Inspect up to 4x the limit so non-text items (stickers, photos) are skipped
+        max_scan = max(limit * 4, 200)
+        async for msg in self.client.iter_messages(entity, limit=max_scan):
             if not msg.text:
                 continue
 
@@ -123,6 +125,10 @@ class UserBot:
                     "date": msg.date,
                 }
             )
+
+            # Stop once we have reached the requested count of text messages
+            if len(messages) >= limit:
+                break
 
         # Reverse so oldest message is first (chronological order)
         messages.reverse()

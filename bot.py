@@ -5,7 +5,9 @@ Handles /start, /help, /list, and /summarize commands.
 Uses the Userbot to fetch messages and the Summarizer to generate summaries.
 """
 
+import asyncio
 import re
+import time
 from telethon import TelegramClient, events
 from config import API_ID, API_HASH, BOT_TOKEN, ALLOWED_USERS
 from userbot import UserBot
@@ -145,9 +147,10 @@ class CompanionBot:
                 )
                 return
 
-            # ── Fetch messages ───────────────────────────────────────
-            await event.reply(
-                f"⏳ Fetching last {msg_count} messages from **{display_name}**...",
+            # ── Fetch messages with live timer ───────────────────────
+            start_time = time.time()
+            status_msg = await event.reply(
+                f"⏳ `[0.0s]` Fetching last {msg_count} messages from **{display_name}**...",
                 parse_mode="md",
             )
 
@@ -155,33 +158,72 @@ class CompanionBot:
                 messages = await self.userbot.get_messages(entity, limit=msg_count)
 
                 if not messages:
-                    await event.reply(
+                    await status_msg.edit(
                         "📭 No text messages found in this group "
                         "(images/stickers are skipped)."
                     )
                     return
 
                 actual_count = len(messages)
-                await event.reply(
-                    f"🤖 Got {actual_count} text messages. "
-                    f"Summarizing in ~{word_limit} words..."
+                fetch_time = round(time.time() - start_time, 1)
+
+                await status_msg.edit(
+                    f"🤖 `[{fetch_time}s]` Collected {actual_count} text messages. "
+                    f"Gemini AI is generating your summary...",
+                    parse_mode="md",
                 )
 
-                # ── Summarize ────────────────────────────────────────
+                # ── Summarize with live heartbeat timer ──────────────
                 messages_text = format_messages_for_llm(messages)
                 messages_text = truncate_text(messages_text)
-                summary = await summarize(messages_text, word_limit)
 
-                # ── Send result ──────────────────────────────────────
+                # Background task: update the status message every 5s
+                heartbeat_active = True
+
+                async def _heartbeat():
+                    tick = 0
+                    spinner = ["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"]
+                    while heartbeat_active:
+                        await asyncio.sleep(5)
+                        if not heartbeat_active:
+                            break
+                        tick += 1
+                        elapsed = round(time.time() - start_time, 1)
+                        icon = spinner[tick % len(spinner)]
+                        try:
+                            await status_msg.edit(
+                                f"{icon} `[{elapsed}s]` Gemini AI is still working on your summary...",
+                                parse_mode="md",
+                            )
+                        except Exception:
+                            pass
+
+                heartbeat_task = asyncio.create_task(_heartbeat())
+
+                try:
+                    async with self.bot.action(event.chat_id, "typing"):
+                        summary = await summarize(messages_text, word_limit)
+                finally:
+                    heartbeat_active = False
+                    heartbeat_task.cancel()
+
+                total_time = round(time.time() - start_time, 1)
+
+                # ── Edit into final result with timing badge ──────────
                 response = (
                     f"📝 **Summary of {display_name}**\n"
-                    f"_({actual_count} messages → ~{word_limit} words)_\n\n"
+                    f"_({actual_count} messages → ~{word_limit} words • ⏱️ took {total_time}s)_\n\n"
                     f"{summary}"
                 )
-                await event.reply(response, parse_mode="md")
+                try:
+                    await status_msg.edit(response, parse_mode="md")
+                except Exception:
+                    # If edit fails (e.g. Markdown parsing), send as new message
+                    await event.reply(response)
 
             except Exception as e:
-                await event.reply(f"❌ Error: `{e}`", parse_mode="md")
+                elapsed = round(time.time() - start_time, 1)
+                await status_msg.edit(f"❌ `[{elapsed}s]` Error: `{e}`")
 
     @staticmethod
     def _parse_summarize_args(raw: str):
