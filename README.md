@@ -40,8 +40,11 @@ You need 4 things (all free and instant):
 ### Step 2: Install
 
 ```bash
+# Download the Program
+git clone https://github.com/tomaradityasinghgit11-spec/telegram-chat-summarizer.git
+
 # Navigate to the project folder
-cd D:\Projects\telegram-summarizer
+cd telegram-chat-summarizer
 
 # Create a virtual environment (recommended)
 python -m venv venv
