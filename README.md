@@ -40,9 +40,6 @@ You need 4 things (all free and instant):
 ### Step 2: Install
 
 ```bash
-# Download the Program
-git clone https://github.com/tomaradityasinghgit11-spec/telegram-chat-summarizer.git
-
 # Navigate to the project folder
 cd telegram-chat-summarizer
 
