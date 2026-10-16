@@ -46,7 +46,7 @@ for uid in _raw_allowed.split(","):
 OWNER_ID = next(iter(ALLOWED_USERS)) if ALLOWED_USERS else 0
 
 # ── Gemini model (change if you want a different free model) ──────────────
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip().strip("'\"")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip().strip("'\"")
 
 
 def validate() -> None:
